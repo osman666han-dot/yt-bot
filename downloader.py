@@ -32,7 +32,6 @@ def _base_opts() -> dict:
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     if PROXY_URL:
         opts["proxy"] = PROXY_URL
