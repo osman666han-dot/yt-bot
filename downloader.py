@@ -32,6 +32,7 @@ def _base_opts() -> dict:
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     if PROXY_URL:
         opts["proxy"] = PROXY_URL
@@ -136,6 +137,4 @@ def _friendly_error(raw: str) -> str:
         return "Видео недоступно или удалено."
     if "geo" in raw_low or "country" in raw_low:
         return "Видео недоступно в регионе сервера."
-    if "sign in" in raw_low or "not a bot" in raw_low:
-        return "YouTube требует подтверждения, попробуй позже."
     return "Не получилось скачать это видео. Попробуй другую ссылку."
