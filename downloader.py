@@ -16,7 +16,7 @@ class DownloadError(Exception):
 
 @dataclass
 class FormatOption:
-    format_id: str
+    format_id: str       # для видео здесь хранится высота как строка (напр. "720"), для аудио — "bestaudio"
     label: str          # что показываем на кнопке, напр. "720p" или "MP3 (аудио)"
     kind: str           # "video" или "audio"
     filesize_mb: float | None
@@ -59,7 +59,7 @@ async def list_formats(url: str) -> list[FormatOption]:
         seen_heights.add(height)
         size = f.get("filesize") or f.get("filesize_approx")
         options.append(FormatOption(
-            format_id=f["format_id"],
+            format_id=str(height),
             label=f"{height}p",
             kind="video",
             filesize_mb=round(size / (1024 * 1024), 1) if size else None,
@@ -92,7 +92,8 @@ async def download(url: str, format_id: str, kind: str) -> str:
             "preferredcodec": "mp3",
         }]
     else:
-        opts["format"] = f"{format_id}+bestaudio/best"
+        height = format_id  # тут это высота, напр. "720"
+        opts["format"] = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best[height<={height}]"
         opts["merge_output_format"] = "mp4"
 
     def _run():
