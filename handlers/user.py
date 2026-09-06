@@ -73,7 +73,7 @@ async def handle_format_choice(callback: CallbackQuery):
         await callback.answer("Сессия устарела, пришли ссылку заново.", show_alert=True)
         return
 
-    opt = options[int(idx)]  # dict: format_id, label, kind, filesize_mb
+    opt = options[int(idx)]
 
     remaining_free = FREE_DOWNLOADS_PER_DAY - db.count_downloads_today(user_id)
     used_extra = False
@@ -94,7 +94,14 @@ async def handle_format_choice(callback: CallbackQuery):
         if opt["kind"] == "audio":
             await callback.message.answer_audio(FSInputFile(path))
         else:
-            await callback.message.answer_video(FSInputFile(path))
+            meta = downloader.get_video_metadata(path) or {}
+            await callback.message.answer_video(
+                FSInputFile(path),
+                supports_streaming=True,
+                duration=meta.get("duration"),
+                width=meta.get("width"),
+                height=meta.get("height"),
+            )
 
         db.log_download(user_id, callback.from_user.username, url, opt["label"], size_mb, "ok")
         if used_extra:
