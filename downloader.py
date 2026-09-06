@@ -103,6 +103,7 @@ async def download(url: str, format_id: str, kind: str) -> str:
             f"/bestvideo+bestaudio/best"
         )
         opts["merge_output_format"] = "mp4"
+        opts["postprocessor_args"] = {"ffmpeg": ["-movflags", "+faststart"]}
 
     def _run():
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -128,6 +129,31 @@ def cleanup(path: str):
             os.remove(path)
     except OSError:
         pass
+
+
+def get_video_metadata(path: str) -> dict | None:
+    """duration/width/height через ffprobe — нужно Telegram для показа видео плеером сразу, без ожидания скачивания."""
+    import json
+    import subprocess
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet", "-print_format", "json",
+                "-show_format", "-show_streams", path,
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        data = json.loads(result.stdout)
+        duration = int(float(data.get("format", {}).get("duration", 0)))
+        width = height = None
+        for stream in data.get("streams", []):
+            if stream.get("codec_type") == "video":
+                width = stream.get("width")
+                height = stream.get("height")
+                break
+        return {"duration": duration, "width": width, "height": height}
+    except Exception:
+        return None
 
 
 def _friendly_error(raw: str) -> str:
