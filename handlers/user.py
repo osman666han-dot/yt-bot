@@ -16,6 +16,7 @@ _pending_url: dict[str, str] = {}
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
+    db.register_user(message.from_user.id, message.from_user.username)
     await message.answer(
         "Привет! Кидай ссылку на YouTube-видео — пришлю на выбор видео (до 1080p) или mp3.\n\n"
         f"Бесплатно: {FREE_DOWNLOADS_PER_DAY} скачиваний в сутки. "
@@ -26,6 +27,7 @@ async def cmd_start(message: Message):
 @router.message(F.text.contains("youtu"))
 async def handle_link(message: Message):
     user_id = message.from_user.id
+    db.register_user(user_id, message.from_user.username)
 
     since_last = db.seconds_since_last_download(user_id)
     if since_last is not None and since_last < COOLDOWN_SECONDS:
