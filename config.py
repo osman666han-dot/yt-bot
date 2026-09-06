@@ -11,8 +11,12 @@ MAX_QUALITY = "1080"
 TMP_DIR = "/tmp/ytbot"
 DOWNLOAD_TIMEOUT_SEC = 600
 
-# --- Прокси ---
-PROXY_URL = os.getenv("PROXY_URL", "")
+# --- Прокси (пока выключено, включаем одной переменной когда нужно) ---
+PROXY_URL = os.getenv("PROXY_URL", "")  # напр. socks5://user:pass@host:port, пусто = без прокси
+
+# --- Куки YouTube (обходит блок "Sign in to confirm you're not a bot" на облачных IP) ---
+# Вставь сюда содержимое экспортированного cookies.txt (формат Netscape) целиком, как есть
+YTDLP_COOKIES_CONTENT = os.getenv("YTDLP_COOKIES_CONTENT", "")
 
 # --- Лимиты и монетизация ---
 FREE_DOWNLOADS_PER_DAY = 5
