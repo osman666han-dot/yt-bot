@@ -18,9 +18,9 @@ _pending_url: dict[str, str] = {}
 async def cmd_start(message: Message):
     db.register_user(message.from_user.id, message.from_user.username)
     await message.answer(
-        "Привет! Кидай ссылку на YouTube-видео — пришлю на выбор видео (до 1080p) или mp3.\n\n"
-        f"Бесплатно: {FREE_DOWNLOADS_PER_DAY} скачиваний в сутки. "
-        f"Дальше — {STARS_PRICE_PER_EXTRA_BATCH} ⭐ за каждые +{EXTRA_BATCH_SIZE}."
+        "Бот для бесплатного скачивания видео с YouTube.\n"
+        "От проекта @kolokotol\n\n"
+        "Просто пришли ссылку боту, выбери качество и жди скачивания."
     )
 
 
