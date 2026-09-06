@@ -98,7 +98,10 @@ async def download(url: str, format_id: str, kind: str) -> str:
         }]
     else:
         height = format_id
-        opts["format"] = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best[height<={height}]"
+        opts["format"] = (
+            f"bestvideo[height<={height}]+bestaudio/best[height<={height}]"
+            f"/bestvideo+bestaudio/best"
+        )
         opts["merge_output_format"] = "mp4"
 
     def _run():
