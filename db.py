@@ -1,4 +1,5 @@
 import sqlite3
+import json
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
@@ -13,6 +14,15 @@ def init_db():
                 username TEXT,
                 first_seen TEXT NOT NULL,
                 blocked INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS pending_downloads (
+                key TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                options_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
             )
         """)
         c.execute("""
@@ -59,6 +69,34 @@ def register_user(user_id: int, username: str | None):
 def mark_blocked(user_id: int, blocked: bool = True):
     with _conn() as c:
         c.execute("UPDATE users SET blocked = ? WHERE user_id = ?", (1 if blocked else 0, user_id))
+
+
+def save_pending(key: str, user_id: int, url: str, options: list[dict]):
+    """Сохраняем список форматов в БД, а не в память — переживает рестарт процесса."""
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO pending_downloads (key, user_id, url, options_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET url = ?, options_json = ?, created_at = ?",
+            (key, user_id, url, json.dumps(options), datetime.now(timezone.utc).isoformat(),
+             url, json.dumps(options), datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def get_pending(key: str):
+    """Возвращает (url, options) или (None, None), если не найдено."""
+    with _conn() as c:
+        row = c.execute(
+            "SELECT url, options_json FROM pending_downloads WHERE key = ?", (key,)
+        ).fetchone()
+        if not row:
+            return None, None
+        return row[0], json.loads(row[1])
+
+
+def delete_pending(key: str):
+    with _conn() as c:
+        c.execute("DELETE FROM pending_downloads WHERE key = ?", (key,))
 
 
 def get_all_users():
