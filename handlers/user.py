@@ -9,10 +9,6 @@ from config import FREE_DOWNLOADS_PER_DAY, EXTRA_BATCH_SIZE, STARS_PRICE_PER_EXT
 
 router = Router()
 
-# храним варианты форматов между "прислал ссылку" и "нажал кнопку"
-_pending: dict[str, list[downloader.FormatOption]] = {}
-_pending_url: dict[str, str] = {}
-
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
@@ -51,8 +47,11 @@ async def handle_link(message: Message):
         return
 
     key = f"{user_id}:{message.message_id}"
-    _pending[key] = options
-    _pending_url[key] = message.text.strip()
+    options_dicts = [
+        {"format_id": o.format_id, "label": o.label, "kind": o.kind, "filesize_mb": o.filesize_mb}
+        for o in options
+    ]
+    db.save_pending(key, user_id, message.text.strip(), options_dicts)
 
     kb = InlineKeyboardBuilder()
     for i, opt in enumerate(options):
@@ -68,13 +67,12 @@ async def handle_format_choice(callback: CallbackQuery):
     _, key, idx = callback.data.split(":", 2)
     user_id = callback.from_user.id
 
-    options = _pending.get(key)
-    url = _pending_url.get(key)
-    if options is None or url is None:
+    url, options = db.get_pending(key)
+    if url is None or options is None:
         await callback.answer("Сессия устарела, пришли ссылку заново.", show_alert=True)
         return
 
-    opt = options[int(idx)]
+    opt = options[int(idx)]  # dict: format_id, label, kind, filesize_mb
 
     # повторная проверка лимита (мог исчерпаться между показом кнопок и нажатием)
     remaining_free = FREE_DOWNLOADS_PER_DAY - db.count_downloads_today(user_id)
@@ -86,30 +84,29 @@ async def handle_format_choice(callback: CallbackQuery):
             return
         used_extra = True
 
-    await callback.message.edit_text(f"Качаю в {opt.label}...")
+    await callback.message.edit_text(f"Качаю в {opt['label']}...")
 
     path = None
     try:
-        path = await downloader.download(url, opt.format_id, opt.kind)
+        path = await downloader.download(url, opt["format_id"], opt["kind"])
         size_mb = round(__import__("os").path.getsize(path) / (1024 * 1024), 1)
 
-        if opt.kind == "audio":
+        if opt["kind"] == "audio":
             await callback.message.answer_audio(open(path, "rb"))
         else:
             await callback.message.answer_video(open(path, "rb"))
 
-        db.log_download(user_id, callback.from_user.username, url, opt.label, size_mb, "ok")
+        db.log_download(user_id, callback.from_user.username, url, opt["label"], size_mb, "ok")
         if used_extra:
             db.spend_extra_credit(user_id)
 
     except downloader.DownloadError as e:
-        db.log_download(user_id, callback.from_user.username, url, opt.label, None, "error", str(e))
+        db.log_download(user_id, callback.from_user.username, url, opt["label"], None, "error", str(e))
         await callback.message.answer(str(e))
     finally:
         if path:
             downloader.cleanup(path)
-        _pending.pop(key, None)
-        _pending_url.pop(key, None)
+        db.delete_pending(key)
 
 
 async def _offer_payment(message: Message):
