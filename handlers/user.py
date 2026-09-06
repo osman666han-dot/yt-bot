@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, LabeledPrice
+from aiogram.types import Message, CallbackQuery, LabeledPrice, FSInputFile
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -75,7 +75,6 @@ async def handle_format_choice(callback: CallbackQuery):
 
     opt = options[int(idx)]  # dict: format_id, label, kind, filesize_mb
 
-    # повторная проверка лимита (мог исчерпаться между показом кнопок и нажатием)
     remaining_free = FREE_DOWNLOADS_PER_DAY - db.count_downloads_today(user_id)
     used_extra = False
     if remaining_free <= 0:
@@ -93,9 +92,9 @@ async def handle_format_choice(callback: CallbackQuery):
         size_mb = round(__import__("os").path.getsize(path) / (1024 * 1024), 1)
 
         if opt["kind"] == "audio":
-            await callback.message.answer_audio(open(path, "rb"))
+            await callback.message.answer_audio(FSInputFile(path))
         else:
-            await callback.message.answer_video(open(path, "rb"))
+            await callback.message.answer_video(FSInputFile(path))
 
         db.log_download(user_id, callback.from_user.username, url, opt["label"], size_mb, "ok")
         if used_extra:
