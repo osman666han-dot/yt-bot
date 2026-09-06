@@ -67,7 +67,6 @@ async def list_formats(url: str) -> list[FormatOption]:
 
     options.sort(key=lambda o: int(o.label.replace("p", "")), reverse=True)
 
-    # аудио-опция всегда одна, качество не выбираем
     options.append(FormatOption(
         format_id="bestaudio",
         label="MP3 (аудио)",
@@ -107,7 +106,6 @@ async def download(url: str, format_id: str, kind: str) -> str:
     except yt_dlp.utils.DownloadError as e:
         raise DownloadError(_friendly_error(str(e)))
 
-    # находим итоговый файл (расширение проставит yt-dlp/ffmpeg)
     for fname in os.listdir(TMP_DIR):
         if fname.startswith(file_id):
             return os.path.join(TMP_DIR, fname)
