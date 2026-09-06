@@ -31,9 +31,9 @@ def init_db():
                 user_id INTEGER NOT NULL,
                 username TEXT,
                 url TEXT NOT NULL,
-                format TEXT NOT NULL,       -- e.g. "720p" or "mp3"
+                format TEXT NOT NULL,
                 file_size_mb REAL,
-                status TEXT NOT NULL,       -- ok / error
+                status TEXT NOT NULL,
                 error_text TEXT,
                 created_at TEXT NOT NULL
             )
@@ -41,7 +41,7 @@ def init_db():
         c.execute("""
             CREATE TABLE IF NOT EXISTS extra_credits (
                 user_id INTEGER PRIMARY KEY,
-                credits INTEGER NOT NULL DEFAULT 0  -- покупные скачивания сверх бесплатных
+                credits INTEGER NOT NULL DEFAULT 0
             )
         """)
 
@@ -57,7 +57,6 @@ def _conn():
 
 
 def register_user(user_id: int, username: str | None):
-    """Вызывать при любом взаимодействии юзера с ботом (start, ссылка и т.п.)."""
     with _conn() as c:
         c.execute(
             "INSERT INTO users (user_id, username, first_seen, blocked) VALUES (?, ?, ?, 0)"
@@ -72,7 +71,6 @@ def mark_blocked(user_id: int, blocked: bool = True):
 
 
 def save_pending(key: str, user_id: int, url: str, options: list[dict]):
-    """Сохраняем список форматов в БД, а не в память — переживает рестарт процесса."""
     with _conn() as c:
         c.execute(
             "INSERT INTO pending_downloads (key, user_id, url, options_json, created_at)"
@@ -84,7 +82,6 @@ def save_pending(key: str, user_id: int, url: str, options: list[dict]):
 
 
 def get_pending(key: str):
-    """Возвращает (url, options) или (None, None), если не найдено."""
     with _conn() as c:
         row = c.execute(
             "SELECT url, options_json FROM pending_downloads WHERE key = ?", (key,)
@@ -100,7 +97,6 @@ def delete_pending(key: str):
 
 
 def get_all_users():
-    """Все юзера с количеством скачиваний и статусом блокировки."""
     with _conn() as c:
         return c.execute("""
             SELECT u.user_id, u.username, u.blocked, u.first_seen,
@@ -113,7 +109,6 @@ def get_all_users():
 
 
 def get_active_user_ids():
-    """Для рассылки — только те, кто не заблокировал бота."""
     with _conn() as c:
         return [row[0] for row in c.execute("SELECT user_id FROM users WHERE blocked = 0").fetchall()]
 
@@ -130,7 +125,6 @@ def log_download(user_id: int, username: str, url: str, fmt: str,
 
 
 def seconds_since_last_download(user_id: int) -> float | None:
-    """None если скачиваний ещё не было."""
     with _conn() as c:
         row = c.execute(
             "SELECT created_at FROM downloads WHERE user_id = ? AND status = 'ok'"
@@ -144,7 +138,6 @@ def seconds_since_last_download(user_id: int) -> float | None:
 
 
 def count_downloads_today(user_id: int) -> int:
-    """Успешные скачивания за текущие календарные сутки UTC."""
     today = datetime.now(timezone.utc).date().isoformat()
     with _conn() as c:
         row = c.execute(
@@ -174,7 +167,19 @@ def spend_extra_credit(user_id: int):
         c.execute("UPDATE extra_credits SET credits = credits - 1 WHERE user_id = ?", (user_id,))
 
 
-# --- для /admin и /logs ---
+def get_error_rate_last_hour():
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    with _conn() as c:
+        total = c.execute(
+            "SELECT COUNT(*) FROM downloads WHERE created_at >= ?", (since,)
+        ).fetchone()[0]
+        errors = c.execute(
+            "SELECT COUNT(*) FROM downloads WHERE created_at >= ? AND status = 'error'", (since,)
+        ).fetchone()[0]
+        pct = round(errors / total * 100, 1) if total else 0.0
+        return total, errors, pct
+
 
 def get_stats():
     with _conn() as c:
