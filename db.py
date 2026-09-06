@@ -8,6 +8,14 @@ from config import DB_PATH
 def init_db():
     with _conn() as c:
         c.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                first_seen TEXT NOT NULL,
+                blocked INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        c.execute("""
             CREATE TABLE IF NOT EXISTS downloads (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -36,6 +44,40 @@ def _conn():
         conn.commit()
     finally:
         conn.close()
+
+
+def register_user(user_id: int, username: str | None):
+    """Вызывать при любом взаимодействии юзера с ботом (start, ссылка и т.п.)."""
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO users (user_id, username, first_seen, blocked) VALUES (?, ?, ?, 0)"
+            " ON CONFLICT(user_id) DO UPDATE SET username = ?, blocked = 0",
+            (user_id, username, datetime.now(timezone.utc).isoformat(), username),
+        )
+
+
+def mark_blocked(user_id: int, blocked: bool = True):
+    with _conn() as c:
+        c.execute("UPDATE users SET blocked = ? WHERE user_id = ?", (1 if blocked else 0, user_id))
+
+
+def get_all_users():
+    """Все юзера с количеством скачиваний и статусом блокировки."""
+    with _conn() as c:
+        return c.execute("""
+            SELECT u.user_id, u.username, u.blocked, u.first_seen,
+                   COUNT(d.id) FILTER (WHERE d.status = 'ok') as downloads_count
+            FROM users u
+            LEFT JOIN downloads d ON d.user_id = u.user_id
+            GROUP BY u.user_id
+            ORDER BY u.first_seen DESC
+        """).fetchall()
+
+
+def get_active_user_ids():
+    """Для рассылки — только те, кто не заблокировал бота."""
+    with _conn() as c:
+        return [row[0] for row in c.execute("SELECT user_id FROM users WHERE blocked = 0").fetchall()]
 
 
 def log_download(user_id: int, username: str, url: str, fmt: str,
