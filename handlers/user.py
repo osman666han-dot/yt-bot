@@ -64,7 +64,8 @@ async def handle_link(message: Message):
 
 @router.callback_query(F.data.startswith("fmt:"))
 async def handle_format_choice(callback: CallbackQuery):
-    _, key, idx = callback.data.split(":", 2)
+    prefix, idx = callback.data.rsplit(":", 1)
+    key = prefix[len("fmt:"):]
     user_id = callback.from_user.id
 
     url, options = db.get_pending(key)
