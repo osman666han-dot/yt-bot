@@ -4,23 +4,27 @@ import os
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x]
 
-# Локальный Bot API сервер (для лимита 2 ГБ вместо 50 МБ)
-# Поднимается отдельным сервисом telegram-bot-api в Railway
-LOCAL_BOT_API_URL = os.getenv("LOCAL_BOT_API_URL", "")  # напр. http://telegram-bot-api:8081
+LOCAL_BOT_API_URL = os.getenv("LOCAL_BOT_API_URL", "")
 
 # --- Скачивание ---
-MAX_QUALITY = "1080"  # максимальное качество видео, выше не отдаём
-TMP_DIR = "/tmp/ytbot"  # временная папка в контейнере, не volume
-DOWNLOAD_TIMEOUT_SEC = 600  # таймаут на одно скачивание
+MAX_QUALITY = "1080"
+TMP_DIR = "/tmp/ytbot"
+DOWNLOAD_TIMEOUT_SEC = 600
 
-# --- Прокси (пока выключено, включаем одной переменной когда нужно) ---
-PROXY_URL = os.getenv("PROXY_URL", "")  # напр. socks5://user:pass@host:port, пусто = без прокси
+# --- Прокси ---
+PROXY_URL = os.getenv("PROXY_URL", "")
 
 # --- Лимиты и монетизация ---
 FREE_DOWNLOADS_PER_DAY = 5
-STARS_PRICE_PER_EXTRA_BATCH = 100  # звёзд за каждые +5 скачиваний сверх бесплатных
+STARS_PRICE_PER_EXTRA_BATCH = 100
 EXTRA_BATCH_SIZE = 5
-COOLDOWN_SECONDS = 600  # не чаще 1 скачивания раз в 10 минут на юзера
+COOLDOWN_SECONDS = 600
+
+# --- Мониторинг ошибок ---
+ERROR_RATE_CHECK_INTERVAL_SEC = 300
+ERROR_RATE_THRESHOLD_PERCENT = 30
+ERROR_RATE_MIN_SAMPLE = 5
+ERROR_RATE_ALERT_COOLDOWN_SEC = 1800
 
 # --- БД ---
-DB_PATH = os.getenv("DB_PATH", "ytbot.db")  # локальный файл, для логов не нужен volume с большим объёмом
+DB_PATH = os.getenv("DB_PATH", "ytbot.db")
