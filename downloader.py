@@ -5,9 +5,14 @@ from dataclasses import dataclass
 
 import yt_dlp
 
-from config import TMP_DIR, DOWNLOAD_TIMEOUT_SEC, MAX_QUALITY, PROXY_URL
+from config import TMP_DIR, DOWNLOAD_TIMEOUT_SEC, MAX_QUALITY, PROXY_URL, YTDLP_COOKIES_CONTENT
 
 os.makedirs(TMP_DIR, exist_ok=True)
+
+_COOKIES_FILE = os.path.join(TMP_DIR, "cookies.txt")
+if YTDLP_COOKIES_CONTENT:
+    with open(_COOKIES_FILE, "w", encoding="utf-8") as f:
+        f.write(YTDLP_COOKIES_CONTENT)
 
 
 class DownloadError(Exception):
@@ -16,9 +21,9 @@ class DownloadError(Exception):
 
 @dataclass
 class FormatOption:
-    format_id: str       # для видео здесь хранится высота как строка (напр. "720"), для аудио — "bestaudio"
-    label: str          # что показываем на кнопке, напр. "720p" или "MP3 (аудио)"
-    kind: str           # "video" или "audio"
+    format_id: str
+    label: str
+    kind: str
     filesize_mb: float | None
 
 
@@ -30,11 +35,12 @@ def _base_opts() -> dict:
     }
     if PROXY_URL:
         opts["proxy"] = PROXY_URL
+    if YTDLP_COOKIES_CONTENT:
+        opts["cookiefile"] = _COOKIES_FILE
     return opts
 
 
 async def list_formats(url: str) -> list[FormatOption]:
-    """Возвращает доступные варианты: видео до MAX_QUALITY + аудио-mp3."""
     def _extract():
         opts = _base_opts()
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -77,7 +83,6 @@ async def list_formats(url: str) -> list[FormatOption]:
 
 
 async def download(url: str, format_id: str, kind: str) -> str:
-    """Скачивает и возвращает путь к файлу на диске. Вызывающий код обязан удалить файл после отправки."""
     file_id = uuid.uuid4().hex
     out_template = os.path.join(TMP_DIR, f"{file_id}.%(ext)s")
 
@@ -91,7 +96,7 @@ async def download(url: str, format_id: str, kind: str) -> str:
             "preferredcodec": "mp3",
         }]
     else:
-        height = format_id  # тут это высота, напр. "720"
+        height = format_id
         opts["format"] = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best[height<={height}]"
         opts["merge_output_format"] = "mp4"
 
@@ -131,4 +136,6 @@ def _friendly_error(raw: str) -> str:
         return "Видео недоступно или удалено."
     if "geo" in raw_low or "country" in raw_low:
         return "Видео недоступно в регионе сервера."
+    if "sign in" in raw_low or "not a bot" in raw_low:
+        return "YouTube требует подтверждения, попробуй позже."
     return "Не получилось скачать это видео. Попробуй другую ссылку."
