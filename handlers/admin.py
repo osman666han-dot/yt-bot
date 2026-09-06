@@ -1,6 +1,9 @@
-from aiogram import Router, F
+import asyncio
+
+from aiogram import Router, F, Bot
 from aiogram.types import Message
 from aiogram.filters import Command
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 
 import db
 from config import ADMIN_IDS
@@ -27,6 +30,56 @@ async def cmd_admin(message: Message):
         uname = f"@{username}" if username else str(user_id)
         lines.append(f"  {uname} — {cnt}")
     await message.answer("\n".join(lines))
+
+
+@router.message(Command("users"))
+async def cmd_users(message: Message):
+    if not _is_admin(message.from_user.id):
+        return
+    users = db.get_all_users()
+    if not users:
+        await message.answer("Юзеров пока нет.")
+        return
+
+    lines = [f"Всего юзеров: {len(users)}", ""]
+    for user_id, username, blocked, first_seen, downloads_count in users:
+        uname = f"@{username}" if username else str(user_id)
+        status = "🚫 заблокировал" if blocked else "✅"
+        lines.append(f"{uname} (id {user_id}) — {downloads_count} скачиваний — {status}")
+
+    # Telegram режет сообщения на 4096 символов, бьём на части
+    text = "\n".join(lines)
+    for i in range(0, len(text), 4000):
+        await message.answer(text[i:i + 4000])
+
+
+@router.message(Command("broadcast"))
+async def cmd_broadcast(message: Message, bot: Bot):
+    if not _is_admin(message.from_user.id):
+        return
+    text = message.text.partition(" ")[2].strip()
+    if not text:
+        await message.answer("Использование: /broadcast <текст сообщения>")
+        return
+
+    user_ids = db.get_active_user_ids()
+    await message.answer(f"Начинаю рассылку на {len(user_ids)} юзеров...")
+
+    sent, blocked, failed = 0, 0, 0
+    for user_id in user_ids:
+        try:
+            await bot.send_message(user_id, text)
+            sent += 1
+        except TelegramForbiddenError:
+            db.mark_blocked(user_id, True)
+            blocked += 1
+        except TelegramBadRequest:
+            failed += 1
+        await asyncio.sleep(0.05)  # защита от лимитов Telegram на частоту сообщений
+
+    await message.answer(
+        f"Готово. Доставлено: {sent}. Заблокировали бота: {blocked}. Ошибок: {failed}."
+    )
 
 
 @router.message(Command("logs"))
