@@ -21,9 +21,9 @@ class DownloadError(Exception):
 
 @dataclass
 class FormatOption:
-    format_id: str
-    label: str
-    kind: str
+    format_id: str       # для видео здесь хранится высота как строка (напр. "720"), для аудио — "bestaudio"
+    label: str          # что показываем на кнопке, напр. "720p" или "MP3 (аудио)"
+    kind: str           # "video" или "audio"
     filesize_mb: float | None
 
 
@@ -41,6 +41,7 @@ def _base_opts() -> dict:
 
 
 async def list_formats(url: str) -> list[FormatOption]:
+    """Возвращает доступные варианты: видео до MAX_QUALITY + аудио-mp3."""
     def _extract():
         opts = _base_opts()
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -73,6 +74,7 @@ async def list_formats(url: str) -> list[FormatOption]:
 
     options.sort(key=lambda o: int(o.label.replace("p", "")), reverse=True)
 
+    # аудио-опция всегда одна, качество не выбираем
     options.append(FormatOption(
         format_id="bestaudio",
         label="MP3 (аудио)",
@@ -83,6 +85,7 @@ async def list_formats(url: str) -> list[FormatOption]:
 
 
 async def download(url: str, format_id: str, kind: str) -> str:
+    """Скачивает и возвращает путь к файлу на диске. Вызывающий код обязан удалить файл после отправки."""
     file_id = uuid.uuid4().hex
     out_template = os.path.join(TMP_DIR, f"{file_id}.%(ext)s")
 
@@ -96,9 +99,11 @@ async def download(url: str, format_id: str, kind: str) -> str:
             "preferredcodec": "mp3",
         }]
     else:
-        height = format_id
+        height = format_id  # тут это высота, напр. "720"
         opts["format"] = (
-            f"bestvideo[height<={height}]+bestaudio/best[height<={height}]"
+            f"bestvideo[height<={height}][vcodec^=avc1]+bestaudio[acodec^=mp4a]"
+            f"/best[height<={height}][vcodec^=avc1]"
+            f"/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
             f"/bestvideo+bestaudio/best"
         )
         opts["merge_output_format"] = "mp4"
@@ -115,6 +120,7 @@ async def download(url: str, format_id: str, kind: str) -> str:
     except yt_dlp.utils.DownloadError as e:
         raise DownloadError(_friendly_error(str(e)))
 
+    # находим итоговый файл (расширение проставит yt-dlp/ffmpeg)
     for fname in os.listdir(TMP_DIR):
         if fname.startswith(file_id):
             return os.path.join(TMP_DIR, fname)
